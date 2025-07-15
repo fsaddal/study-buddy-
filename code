@@ -1,0 +1,67 @@
+import streamlit as st
+import openai
+import os
+import fitz  # PyMuPDF for PDF parsing
+
+openai.api_key = os.getenv("OPENAI_API_KEY")  # Set your API key securely
+
+st.set_page_config(page_title="📚 Smart Study Buddy", layout="centered")
+st.title("📚 Smart Study Buddy – AI Flashcard & Quiz Generator")
+st.write("Upload a study document or paste content below, and get AI-generated flashcards and quiz questions.")
+
+# Text or PDF input options
+input_method = st.radio("Choose input method:", ("Paste Text", "Upload PDF"))
+
+study_text = ""
+
+if input_method == "Paste Text":
+    study_text = st.text_area("Paste your study content here:")
+
+elif input_method == "Upload PDF":
+    uploaded_file = st.file_uploader("Upload a PDF file", type=["pdf"])
+    if uploaded_file is not None:
+        try:
+            doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+            for page in doc:
+                study_text += page.get_text()
+            st.success("PDF content loaded successfully!")
+        except Exception as e:
+            st.error(f"Error reading PDF: {e}")
+
+# Button to generate flashcards and quiz
+if st.button("Generate Flashcards & Quiz") and study_text.strip():
+    with st.spinner("Generating flashcards and quiz using AI..."):
+        prompt = f"""
+        Create 5 flashcards and 5 quiz questions based on the following study content.
+        Format:
+        Flashcards:
+        - Q: question text
+          A: answer text
+
+        Quiz:
+        - Q: question text
+          A: correct answer
+          Options: [A, B, C, D]
+
+        Study Material:
+        {study_text[:3000]}  # Limit size for prompt
+        """
+
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are an AI study assistant that helps generate educational flashcards and quizzes."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=800
+            )
+
+            output = response['choices'][0]['message']['content']
+            st.success("Done! See your AI-generated study materials below:")
+            st.markdown(output)
+        except Exception as e:
+            st.error(f"Failed to generate: {e}")
+
+st.markdown("---")
+st.caption("Made with Python, Streamlit, PyMuPDF, and OpenAI")
